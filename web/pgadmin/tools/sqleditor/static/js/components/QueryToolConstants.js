@@ -9,6 +9,15 @@
 import gettext from 'sources/gettext';
 import { getPlatform } from '../../../../../static/js/utils';
 
+/* Whether Execute script should run only the query the cursor sits in,
+ * rather than the whole editor, when nothing is selected. Governed by the
+ * 'execute_script_at_cursor' preference, in the manner of DBeaver. A missing
+ * preference (an older config database, or a non-Query Tool context) means
+ * the historical whole-script behaviour. */
+export function executeScriptAtCursor(sqlEditorPref) {
+  return Boolean(sqlEditorPref?.execute_script_at_cursor);
+}
+
 export const QUERY_TOOL_EVENTS = {
   TRIGGER_STOP_EXECUTION: 'TRIGGER_STOP_EXECUTION',
   TRIGGER_EXECUTION: 'TRIGGER_EXECUTION',

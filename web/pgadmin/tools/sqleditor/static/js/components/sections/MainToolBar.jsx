@@ -21,7 +21,7 @@ import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
 import ExplicitRoundedIcon from '@mui/icons-material/ExplicitRounded';
 import FormatListNumberedRoundedIcon from '@mui/icons-material/FormatListNumberedRounded';
 import HelpIcon from '@mui/icons-material/HelpRounded';
-import {QUERY_TOOL_EVENTS, CONNECTION_STATUS, MODAL_DIALOGS} from '../QueryToolConstants';
+import {QUERY_TOOL_EVENTS, CONNECTION_STATUS, MODAL_DIALOGS, executeScriptAtCursor} from '../QueryToolConstants';
 import { QueryToolConnectionContext, QueryToolContext, QueryToolEventsContext } from '../QueryToolComponent';
 import { PgMenu, PgMenuDivider, PgMenuItem, usePgMenuGroup, PgSubMenu} from '../../../../../../static/js/components/Menu';
 import gettext from 'sources/gettext';
@@ -96,8 +96,16 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
     }
   }, [queryToolCtx.preferences.sqleditor]);
   const executeScript = useCallback(()=>{
-    eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION);
-  }, []);
+    /* With 'Execute script runs the query at the cursor?' set, Execute
+     * script behaves like Execute query when nothing is selected: it runs
+     * the single query the cursor sits in, delimited by blank lines. The
+     * underline warning belongs to the Execute query button alone, so it is
+     * deliberately not raised here - this is the routine execution path. A
+     * selection still wins either way; triggerExecution() prefers it over
+     * the cursor query. */
+    eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION, null, '',
+      executeScriptAtCursor(queryToolCtx.preferences.sqleditor));
+  }, [queryToolCtx.preferences.sqleditor]);
   const cancelQuery = useCallback(()=>{
     eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_STOP_EXECUTION);
   }, []);
@@ -555,7 +563,8 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
         <PgButtonGroup size="small">
           <PgIconButton title={gettext('Cancel query')} icon={<StopRoundedIcon style={{height: 'unset'}} />}
             onClick={cancelQuery} disabled={buttonsDisabled['cancel']} shortcut={queryToolPref.btn_cancel_query} />
-          <PgIconButton title={gettext('Execute script')} icon={<PlayArrowRoundedIcon style={{height: 'unset'}} />}
+          <PgIconButton title={(executeScriptAtCursor(queryToolPref) && queryToolCtx.params.is_query_tool) ? gettext('Execute query at cursor') : gettext('Execute script')}
+            icon={<PlayArrowRoundedIcon style={{height: 'unset'}} />}
             onClick={executeScript} disabled={buttonsDisabled['execute']} shortcut={queryToolPref.execute_script}/>
           <PgIconButton title={gettext('Execute query')} icon={<ExecuteQueryIcon style={{padding: '2px 5px'}} />}
             onClick={executeCursor} disabled={buttonsDisabled['execute'] || !queryToolCtx.params.is_query_tool} shortcut={queryToolPref.execute_cursor}/>

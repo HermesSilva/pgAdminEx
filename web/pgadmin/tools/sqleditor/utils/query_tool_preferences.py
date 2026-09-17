@@ -143,11 +143,12 @@ def register_query_tool_preferences(self):
 
     self.show_prompt_save_query_changes = self.preference.register(
         'Options', 'prompt_save_query_changes',
-        gettext("Prompt to save unsaved query changes?"), 'boolean', True,
+        gettext("Prompt to save unsaved query changes?"), 'boolean', False,
         category_label=PREF_LABEL_OPTIONS,
         help_str=gettext(
             'Specifies whether or not to prompt the user to save unsaved '
-            'queries on Query Tool exit.'
+            'queries on Query Tool exit. Disabled by default: closing a '
+            'Query Tool tab discards unsaved query text without asking.'
         )
     )
 
@@ -179,22 +180,25 @@ def register_query_tool_preferences(self):
 
     self.show_prompt_save_data_changes = self.preference.register(
         'Options', 'prompt_save_data_changes',
-        gettext("Prompt to save unsaved data changes?"), 'boolean', True,
+        gettext("Prompt to save unsaved data changes?"), 'boolean', False,
         category_label=PREF_LABEL_OPTIONS,
         help_str=gettext(
             'Specifies whether or not to prompt the user to save unsaved '
-            'data on data grid exit.'
+            'data on data grid exit. Disabled by default: closing the tab '
+            'discards uncommitted grid edits without asking.'
         )
     )
 
     self.show_prompt_commit_transaction = self.preference.register(
         'Options', 'prompt_commit_transaction',
         gettext("Prompt to commit/rollback active transactions?"), 'boolean',
-        True,
+        False,
         category_label=PREF_LABEL_OPTIONS,
         help_str=gettext(
             'Specifies whether or not to prompt the user to commit or '
-            'rollback an active transaction on Query Tool exit.'
+            'rollback an active transaction on Query Tool exit. Disabled by '
+            'default: an open transaction is rolled back when the '
+            'connection closes, so uncommitted work is lost without asking.'
         )
     )
 
@@ -238,6 +242,20 @@ def register_query_tool_preferences(self):
         help_str=gettext(
             'If set to True, the Query Tool will parse and underline '
             'the query at the cursor position.'
+        )
+    )
+
+    self.execute_script_at_cursor = self.preference.register(
+        'Options', 'execute_script_at_cursor',
+        gettext("Execute script runs the query at the cursor?"),
+        'boolean', True,
+        category_label=PREF_LABEL_OPTIONS,
+        help_str=gettext(
+            'If set to True, Execute script runs only the query at the '
+            'cursor position, delimited by blank lines, when nothing is '
+            'selected - in the manner of DBeaver. Set to False to have it '
+            'run the whole editor contents. Either way, a selection is '
+            'always executed as-is, and Execute query is unaffected.'
         )
     )
 
