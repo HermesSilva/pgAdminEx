@@ -56,6 +56,9 @@ jobs:
           sudo apt update
           sudo apt install -y libpq-dev libffi-dev libssl-dev libkrb5-dev \
             zlib1g-dev
+          # package.json pins yarn 4.x through packageManager, which only
+          # Corepack honours; the runner's global yarn is 1.22.
+          corepack enable
 
       - name: Install Python dependencies
         run: make install-python
@@ -101,6 +104,10 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip virtualenv
+
+          # The runner's global yarn is 1.22; package.json pins 4.x through
+          # packageManager, which only Corepack honours.
+          corepack enable
 
           # Inno Setup is usually preinstalled; 'already installed' is not a
           # failure. Kerberos returns 3010 - installed, reboot pending -
