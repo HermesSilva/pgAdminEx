@@ -36,8 +36,14 @@ ArchitecturesInstallIn64BitMode={#MyAppArchitecturesMode}
 AllowNoIcons=yes
 WizardImageFile=sidebar.bmp
 MinVersion={#MinimumWindowsVer}
+; Signing is opt-in: Make.bat only defines the pgAdminSigntool sign tool
+; when PGADMIN_WINDOWS_CSC names a certificate, and naming a sign tool that
+; was never defined aborts the compile with "Value of [Setup] section
+; directive "SignTool" is invalid". Pass /DSIGNED to ISCC to sign.
+#ifdef SIGNED
 SignTool=pgAdminSigntool
 SignedUninstaller=yes
+#endif
 CloseApplications=yes
 
 [Languages]

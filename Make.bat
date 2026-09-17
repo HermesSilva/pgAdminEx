@@ -356,6 +356,10 @@ REM Main build sequence Ends
     COPY "%PGADMIN_POSTGRES_DIR%\bin\libssl-*-x64.dll" "%BUILDROOT%\runtime" > nul || EXIT /B 1
     IF EXIST "%PGADMIN_POSTGRES_DIR%\bin\libintl-*.dll" COPY "%PGADMIN_POSTGRES_DIR%\bin\libintl-*.dll" "%BUILDROOT%\runtime" > nul
     IF EXIST "%PGADMIN_POSTGRES_DIR%\bin\libiconv-*.dll" COPY "%PGADMIN_POSTGRES_DIR%\bin\libiconv-*.dll" "%BUILDROOT%\runtime" > nul
+    REM libintl links against libwinpthread, so staging libintl without it
+    REM leaves libpq unloadable: LoadLibrary fails with error 193 and
+    REM pgAdmin exits at startup with "no pq wrapper available".
+    IF EXIST "%PGADMIN_POSTGRES_DIR%\bin\libwinpthread-*.dll" COPY "%PGADMIN_POSTGRES_DIR%\bin\libwinpthread-*.dll" "%BUILDROOT%\runtime" > nul
     IF EXIST "%PGADMIN_POSTGRES_DIR%\bin\liblz4.dll" COPY "%PGADMIN_POSTGRES_DIR%\bin\liblz4.dll" "%BUILDROOT%\runtime" > nul
     IF EXIST "%PGADMIN_POSTGRES_DIR%\bin\libzstd.dll" COPY "%PGADMIN_POSTGRES_DIR%\bin\libzstd.dll" "%BUILDROOT%\runtime" > nul
     COPY "%PGADMIN_POSTGRES_DIR%\bin\zlib1.dll" "%BUILDROOT%\runtime" > nul || EXIT /B 1
@@ -391,7 +395,7 @@ REM Main build sequence Ends
 
     ECHO Creating windows installer using INNO tool...
     IF NOT "%PGADMIN_WINDOWS_CSC%" == "" (
-        CALL "%PGADMIN_INNOTOOL_DIR%\ISCC.exe" "%WD%\pkg\win32\installer.iss" "/SpgAdminSigntool=%PGADMIN_SIGNTOOL_DIR%\signtool.exe sign /sm /n $q%PGADMIN_WINDOWS_CSC%$q /tr http://timestamp.digicert.com /td sha256 /fd sha1 /v $f" || EXIT /B 1
+        CALL "%PGADMIN_INNOTOOL_DIR%\ISCC.exe" "%WD%\pkg\win32\installer.iss" "/DSIGNED" "/SpgAdminSigntool=%PGADMIN_SIGNTOOL_DIR%\signtool.exe sign /sm /n $q%PGADMIN_WINDOWS_CSC%$q /tr http://timestamp.digicert.com /td sha256 /fd sha1 /v $f" || EXIT /B 1
     ) ELSE (
         CALL "%PGADMIN_INNOTOOL_DIR%\ISCC.exe" "%WD%\pkg\win32\installer.iss" || EXIT /B 1
     )
