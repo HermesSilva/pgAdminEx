@@ -101,9 +101,32 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip virtualenv
-          choco install innosetup --no-progress -y
+
+          # Inno Setup is usually preinstalled; 'already installed' is not a
+          # failure. Kerberos returns 3010 - installed, reboot pending -
+          # which choco reports as an error even though the files we need
+          # are in place. Accept both rather than failing the build.
+          choco install innosetup --no-progress -y --no-color
+          if ($LASTEXITCODE -notin 0, 1641, 3010) {
+            throw "Inno Setup install failed ($LASTEXITCODE)"
+          }
+
           # MIT Kerberos: Make.bat copies kinit.exe and five DLLs from it.
-          choco install mitkerberos --no-progress -y --ignore-checksums
+          choco install mitkerberos --no-progress -y --no-color `
+            --ignore-checksums
+          if ($LASTEXITCODE -notin 0, 1641, 3010) {
+            throw "MIT Kerberos install failed ($LASTEXITCODE)"
+          }
+
+          # What matters is the files, not the exit code.
+          $krb = 'C:\Program Files\MIT\Kerberos\bin'
+          foreach ($f in 'kinit.exe', 'krb5_64.dll', 'comerr64.dll',
+                         'k5sprt64.dll', 'gssapi64.dll') {
+            if (-not (Test-Path "$krb\$f")) {
+              throw "MIT Kerberos is missing $f"
+            }
+          }
+          $global:LASTEXITCODE = 0
 
       - name: Locate the build prerequisites
         shell: pwsh
