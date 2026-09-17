@@ -124,6 +124,12 @@ class DatabaseModule(CollectionNodeModule):
         from .schemas import schema_blueprint as module
         self.submodules.append(module)
 
+        # Registered after schemas so the Tables module it reuses is already
+        # in place. It shows a 'Tables' shortcut for the public schema as the
+        # database's first child.
+        from .public_tables import blueprint as module
+        self.submodules.append(module)
+
         from .schemas import catalog_blueprint as module
         self.submodules.append(module)
 

@@ -498,6 +498,21 @@ export class Tree {
           idx -= 1;
         }
       }
+
+      /* A node may stand in for ancestors it is not actually under: the
+       * Tables shortcut sits directly below a database but lists the
+       * public schema, so walking up would never reach a schema, and
+       * every URL built from this hierarchy would be missing it. Such a
+       * node carries the stand-ins in 'implied_parents'. Real ancestors
+       * found further up still win, since each type is only filled once. */
+      for (const [nodeType, nodeData] of
+        Object.entries(currentNodeData.implied_parents ?? {})) {
+        if (result[nodeType] === undefined) {
+          result[nodeType] = _.extend({}, nodeData, {'priority': idx});
+          idx -= 1;
+        }
+      }
+
       node_cnt += 1;
       item = item.hasParent() ? item.parent() : null;
     } while (item);

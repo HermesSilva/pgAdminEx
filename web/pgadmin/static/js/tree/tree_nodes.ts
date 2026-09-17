@@ -97,7 +97,13 @@ export class ManageTreeNodes {
     if (_path == '/browser') {
       url = url_for('browser.nodes');
     } else {
-      const _parent_url = self.generate_url(_path);
+      /* The path is normally derived by walking up the tree, which works
+       * because a node sits under the very parents its endpoint expects.
+       * A node placed elsewhere - the Tables shortcut under a database,
+       * which lists the public schema - can declare the path itself,
+       * since walking up would not reach the schema its endpoint needs. */
+      const _parent_url = node.metadata.data.url_path ??
+        self.generate_url(_path);
       if (node.metadata.data._pid == null ) {
         url = node.metadata.data._type + '/children/' + node.metadata.data._id;
       }

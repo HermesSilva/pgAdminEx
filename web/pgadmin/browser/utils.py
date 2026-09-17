@@ -86,6 +86,24 @@ def is_version_in_range(sversion, min_ver, max_ver):
     return False
 
 
+def sort_children_nodes(children):
+    """Order a node's children for the Object Explorer.
+
+    Sorted by label, then any node carrying a 'sort_priority' is moved
+    ahead of that run - the Tables shortcut under a database uses this to
+    stay at the top. Moving after sorting keeps the comparison on the
+    plain label, and the extra pass only runs when such a node exists.
+    """
+    children = sorted(children, key=lambda c: c['label'])
+
+    pinned = [c for c in children if c.get('sort_priority')]
+    if not pinned:
+        return children
+
+    rest = [c for c in children if not c.get('sort_priority')]
+    return sorted(pinned, key=lambda c: c['sort_priority']) + rest
+
+
 class PGChildModule():
     """
     class PGChildModule
@@ -349,12 +367,7 @@ class NodeView(View, metaclass=type(MethodView)):
         if isinstance(children, flask.Response):
             return children
 
-        # Return sorted nodes based on label
-        return make_json_response(
-            data=sorted(
-                children, key=lambda c: c['label']
-            )
-        )
+        return make_json_response(data=sort_children_nodes(children))
 
     def get_children_nodes(self, *args, **kwargs):
         """
@@ -467,13 +480,7 @@ class PGChildNodeView(NodeView):
         if isinstance(children, flask.Response):
             return children
 
-        # Return sorted nodes based on label
-        return make_json_response(
-            data=sorted(
-                children,
-                key=lambda c: c['label']
-            )
-        )
+        return make_json_response(data=sort_children_nodes(children))
 
     def get_dependencies(self, conn, object_id, where=None,
                          show_system_objects=None, is_schema_diff=False):
