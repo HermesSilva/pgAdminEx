@@ -114,11 +114,18 @@ key combination to select from a popup menu of autocomplete options.
     :alt: Query tool autocomplete feature
     :align: center
 
-After entering a query, select the *Execute script* icon from the toolbar. The
-complete contents of the SQL editor panel will be sent to the database server
-for execution. To execute only a section of the code that is displayed in the
-SQL editor, highlight the text that you want the server to execute, and click the
-*Execute script* icon.
+After entering a query, select the *Execute script* icon from the toolbar. By
+default, only the query the cursor sits in is sent to the database server for
+execution; queries are delimited by blank lines, so a script made of several
+statements separated by a blank line can be run one statement at a time simply
+by placing the cursor in it. To send the complete contents of the SQL editor
+panel instead, set *Execute script runs the query at the cursor?* to *False*
+in the Query Tool's Options preferences.
+
+To execute only a section of the code that is displayed in the SQL editor,
+highlight the text that you want the server to execute, and click the
+*Execute script* icon. A highlighted selection is always executed as-is,
+whatever that preference is set to.
 
 .. image:: images/query_execute_script.png
     :alt: Query tool execute script section

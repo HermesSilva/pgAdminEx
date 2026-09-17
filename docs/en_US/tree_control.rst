@@ -19,6 +19,11 @@ view:
   control.
 * Click the minus sign (-) to the left of a node to close that node.
 
+Each database shows a *Tables* node as its first child, listing the tables of
+the ``public`` schema. It is a shortcut to the same tables reachable through
+*Schemas* > *public* > *Tables*, and its entries behave identically. A database
+with no accessible ``public`` schema does not show it.
+
 You can also **drag and drop** certain objects to the Query Tool which
 can save time in typing long object names. Text containing the object name will be
 fully qualified with schema. Double quotes will be added if required.

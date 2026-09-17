@@ -1,0 +1,200 @@
+name: Release installers
+
+# Builds the installers on every push to master and publishes them as a
+# GitHub Release, so each commit is downloadable without a local toolchain.
+#
+# The version is the upstream APP_RELEASE.APP_REVISION from web/version.py
+# with the run number appended - 9.18.42 for the 42nd build of 9.18. That
+# leaves web/version.py alone, so the fork stays rebaseable on upstream.
+
+on:
+  push:
+    branches: [ "master" ]
+
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.ref }}'
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive the version
+        id: v
+        run: |
+          MAJOR=$(grep '^APP_RELEASE' web/version.py | tr -dc '0-9')
+          MINOR=$(grep '^APP_REVISION' web/version.py | tr -dc '0-9')
+          VERSION="${MAJOR}.${MINOR}.${{ github.run_number }}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building ${VERSION}"
+
+  # Source tarball and pip wheel: both build on a plain Linux runner and
+  # need no credentials.
+  linux:
+    needs: version
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install platform dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y libpq-dev libffi-dev libssl-dev libkrb5-dev \
+            zlib1g-dev
+
+      - name: Install Python dependencies
+        run: make install-python
+
+      - name: Build the source tarball
+        run: |
+          . venv/bin/activate
+          make src
+
+      - name: Build the pip wheel
+        run: |
+          . venv/bin/activate
+          pip install wheel sphinx sphinxcontrib-youtube
+          make pip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            dist/*.tar.gz
+            dist/*.whl
+          if-no-files-found: error
+
+  # The Windows installer. Make.bat expects tools the runner does not have,
+  # so they are installed first; see build-installer.cmd for the same set.
+  # The result is unsigned - there is no certificate on a public runner -
+  # which Windows SmartScreen warns about on first run.
+  windows:
+    needs: version
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install build tools
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip virtualenv
+          choco install innosetup --no-progress -y
+          # MIT Kerberos: Make.bat copies kinit.exe and five DLLs from it.
+          choco install mitkerberos --no-progress -y --ignore-checksums
+
+      - name: Locate the build prerequisites
+        shell: pwsh
+        run: |
+          # Make.bat's built-in defaults name versions that do not exist on
+          # the runner, so point every PGADMIN_* variable at what is here.
+          $py = Split-Path (Get-Command python).Source
+          "PGADMIN_PYTHON_DIR=$py" >> $env:GITHUB_ENV
+
+          $pg = Get-ChildItem 'C:\Program Files\PostgreSQL' -Directory |
+                  Sort-Object Name -Descending | Select-Object -First 1
+          "PGADMIN_POSTGRES_DIR=$($pg.FullName)" >> $env:GITHUB_ENV
+
+          $inno = @(
+            'C:\Program Files (x86)\Inno Setup 6',
+            'C:\Program Files\Inno Setup 6'
+          ) | Where-Object { Test-Path "$_\ISCC.exe" } | Select-Object -First 1
+          "PGADMIN_INNOTOOL_DIR=$inno" >> $env:GITHUB_ENV
+
+          $krb = 'C:\Program Files\MIT\Kerberos'
+          "PGADMIN_KRB5_DIR=$krb" >> $env:GITHUB_ENV
+
+          # vc_redist.x64.exe ships inside the installer and is run on the
+          # target machine. Take Visual Studio's copy when present,
+          # otherwise fetch Microsoft's.
+          $vc = Get-ChildItem 'C:\Program Files*\Microsoft Visual Studio\*\*\VC\Redist\MSVC\*\vc_redist.x64.exe' `
+                  -ErrorAction SilentlyContinue |
+                Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $vc) {
+            New-Item -ItemType Directory -Force "$env:TEMP\vcredist" | Out-Null
+            curl.exe -L --fail --retry 3 -o "$env:TEMP\vcredist\vc_redist.x64.exe" `
+              https://aka.ms/vs/17/release/vc_redist.x64.exe
+            "PGADMIN_VCREDIST_DIR=$env:TEMP\vcredist" >> $env:GITHUB_ENV
+          } else {
+            "PGADMIN_VCREDIST_DIR=$($vc.Directory.FullName)" >> $env:GITHUB_ENV
+          }
+
+      - name: Provide a wget shim
+        shell: pwsh
+        run: |
+          # Make.bat downloads Electron and rcedit with wget, which Windows
+          # does not ship. It must be an .exe: Make.bat invokes wget without
+          # CALL, and a batch file invoked that way never returns to its
+          # caller - and that download sits in a retry loop with no limit,
+          # so the build would spin forever.
+          $shim = "$env:RUNNER_TEMP\shim"
+          New-Item -ItemType Directory -Force $shim | Out-Null
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          & $csc /nologo /optimize /out:"$shim\wget.exe" pkg\win32\wget_shim.cs
+          # Prove it works now, rather than inside that retry loop.
+          & "$shim\wget.exe" https://raw.githubusercontent.com/electron/electron/main/LICENSE -O "$shim\probe.tmp"
+          if (-not (Test-Path "$shim\probe.tmp")) {
+            throw 'The wget shim could not download a test file'
+          }
+          Remove-Item "$shim\probe.tmp"
+          "$shim" >> $env:GITHUB_PATH
+
+      - name: Build the installer
+        shell: cmd
+        run: Make.bat
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/*.exe
+          if-no-files-found: error
+
+  release:
+    needs: [version, linux, windows]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: pgAdminEx ${{ needs.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          files: artifacts/**/*
+          body: |
+            Built from ${{ github.sha }}.
+
+            | Platform | File |
+            |---|---|
+            | Windows | `pgadmin4-*-x64.exe` |
+            | Any (pip) | `*.whl` |
+            | Source | `*.tar.gz` |
+
+            The Windows installer is **unsigned**, so SmartScreen warns on
+            first run: choose *More info* then *Run anyway*.
