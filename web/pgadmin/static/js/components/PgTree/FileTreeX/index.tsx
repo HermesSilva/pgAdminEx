@@ -600,6 +600,14 @@ export class FileTreeX extends React.Component<IFileTreeXProps> {
   };
 
   private readonly handleItemDoubleClicked = async (ev: React.MouseEvent, item: FileOrDir) => {
+    /* Give the host a chance to act on the double-click first. When it
+     * handles the item (the Object Explorer opening the Query Tool, say),
+     * skip the expand/collapse so the node is not toggled as a side effect
+     * of the action the user actually asked for. */
+    if (await this.props.onDoubleClick?.(ev, item)) {
+      await this.setActiveFile(item as FileEntry);
+      return;
+    }
     await this.toggleDirectory(item as Directory);
     await this.setActiveFile(item as FileEntry);
 

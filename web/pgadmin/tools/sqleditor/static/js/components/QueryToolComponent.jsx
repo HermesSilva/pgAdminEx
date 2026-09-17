@@ -40,6 +40,7 @@ import usePreferences from '../../../../../preferences/static/js/store';
 import { useApplicationState } from '../../../../../settings/static/ApplicationStateProvider';
 import { connectServer, connectServerModal } from './connectServer';
 import { FileManagerUtils  } from '../../../../../misc/file_manager/static/js/components/FileManager';
+import { registerRunQueryListener, forgetPanel } from '../dbl_click_query_tool';
 
 export const QueryToolContext = React.createContext();
 export const QueryToolConnectionContext = React.createContext();
@@ -171,6 +172,8 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
   const qtStateRef = useRef(qtState);
   const eventBus = useRef(eventBusObj || (new EventBus()));
   const docker = useRef(null);
+  /* SQL a double-click asked to run, held until the connection is up. */
+  const autoRunSql = useRef(null);
   const api = useMemo(()=>getApiInstance(), []);
   const modal = useModal();
   const {isSaveToolDataEnabled, getToolContent} = useApplicationState();
@@ -300,6 +303,11 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
       localStorage.removeItem(qtState.params.sql_id);
       if (sqlValue) {
         eventBus.current.fireEvent(QUERY_TOOL_EVENTS.EDITOR_SET_SQL, sqlValue);
+        /* Opened by a double-click on a table or view: hold the SELECT for
+         * initializeQueryTool() to run once the connection is up. */
+        if (qtState.params.dbl_click_auto_run == 'true') {
+          autoRunSql.current = sqlValue;
+        }
       }
       setQtStatePartial({ editor_disabled: false });
     } else if (qtState.params.restore == 'true') {
@@ -390,6 +398,15 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
           let msg = `${selectedConn['server_name']}/${selectedConn['database_name']} - Database connected`;
           pgAdmin.Browser.notifier.success(_.escape(msg));
         }
+        /* Opened by a double-click on a table or view: run the SELECT now
+         * that the connection is up, so the rows are there without a
+         * keypress. Fires once - the flag is cleared straight after - so a
+         * later reconnect does not re-run it behind the user's back. */
+        if(autoRunSql.current) {
+          const sql = autoRunSql.current;
+          autoRunSql.current = null;
+          eventBus.current.fireEvent(QUERY_TOOL_EVENTS.EXECUTION_START, sql, {});
+        }
         // Open the file if filename passed on the parameters.
         if(qtState.params.fileName){
           eventBus.current.fireEvent(QUERY_TOOL_EVENTS.LOAD_FILE, params.fileName, params.storage);
@@ -450,6 +467,12 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
       docker.current?.focus(qtPanelId);
     });
 
+    /* A double-click in the Object Explorer may reuse this panel, sending in
+     * fresh SQL for it to show and, for a SELECT, run. */
+    const deregDblClick = registerRunQueryListener(
+      qtState.params.trans_id, eventBus.current
+    );
+
     eventBus.current.registerListener(QUERY_TOOL_EVENTS.SET_CONNECTION_STATUS, (status)=>{
       setQtStatePartial({connection_status: status});
     });
@@ -509,6 +532,8 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
     return ()=>{
       document.removeEventListener('visibilitychange', onVisibilityChange);
       onLayoutActive.cancel();
+      deregDblClick?.();
+      forgetPanel(qtState.params.trans_id);
       if(qtPanelDocker?.eventBus) {
         qtPanelDocker.eventBus.deregisterListener(LAYOUT_EVENTS.CLOSING, onLayoutClosing);
         qtPanelDocker.eventBus.deregisterListener(LAYOUT_EVENTS.ACTIVE, onLayoutActive);

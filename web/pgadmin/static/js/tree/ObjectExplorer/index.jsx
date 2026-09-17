@@ -121,6 +121,16 @@ export default function ObjectExplorer() {
       sortComparator: (a, b) => {
         // No nee to sort columns
         if (a._metadata && a._metadata.data._type == 'column') return 0;
+        /* aspen-core re-sorts a Directory's children with this on every
+         * insertion, so the order the server sent is not preserved on its
+         * own. A node carrying a sort_priority is lifted out of the
+         * alphabetical run - the Tables shortcut under a database uses it
+         * to stay first. Everything else defaults to 0 and is unaffected. */
+        const aPriority = a._metadata?.data?.sort_priority ?? 0;
+        const bPriority = b._metadata?.data?.sort_priority ?? 0;
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority;
+        }
         // Sort alphabetically
         if (a.constructor === b.constructor) {
           return pgAdmin.natural_sort(a.fileName, b.fileName);
@@ -184,6 +194,28 @@ export default function ObjectExplorer() {
     }
   }, []);
 
+  /* Double-clicking an object opens the Query Tool on it. Returning true
+   * tells the tree the double-click was consumed, leaving the node
+   * unexpanded; anything this does not handle falls through to the usual
+   * expand/collapse. */
+  const onDoubleClick = React.useCallback(async (_ev, item)=>{
+    if(!item) {
+      return false;
+    }
+    try {
+      await pgAdmin.Browser.tree.select(item);
+      /* Imported on demand: the Object Explorer sits below the Query Tool in
+       * the module graph, so importing it outright would make the dependency
+       * circular. */
+      const {handleDoubleClick} = await import(
+        '../../../../tools/sqleditor/static/js/dbl_click_query_tool');
+      return await handleDoubleClick(item);
+    } catch (error) {
+      pgAdmin.Browser.notifier.pgRespErrorNotify(error);
+      return false;
+    }
+  }, []);
+
   if(!treeModelLoaded) {
     return <span>Loading...</span>;
   }
@@ -195,6 +227,7 @@ export default function ObjectExplorer() {
         onReady={itemHandle}
         create={create} update={update} remove={remove}
         height={'100%'} disableCache={true} onContextMenu={onContextMenu}
+        onDoubleClick={onDoubleClick}
         onScroll={()=>{
           contextPos && setContextPos(null);
         }}

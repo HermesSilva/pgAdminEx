@@ -84,6 +84,11 @@ export interface IFileTreeXProps {
     onReady?: (handle: IFileTreeXHandle) => void
     onEvent?: (event: IFileTreeXTriggerEvents) => void
     onContextMenu?: (ev: React.MouseEvent, item?: FileOrDir) => void
+    /**
+     * Handle a double-click on an item. Returning true marks the event as
+     * handled, which suppresses the default expand/collapse.
+     */
+    onDoubleClick?: (ev: React.MouseEvent, item?: FileOrDir) => boolean | Promise<boolean>
     onScroll?: (ev: React.UIEvent<HTMLDivElement>) => void
 }
 
