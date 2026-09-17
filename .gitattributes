@@ -1,2 +1,11 @@
 # Auto detect text files and normalize end of lines to LF (\n)
 * text=auto eol=lf
+
+# ...except Windows batch files, which must keep their CRLF line endings:
+# cmd.exe fails a GOTO across a label in an LF-only file at runtime, with
+# "The system cannot find the batch label specified". Marked -text rather
+# than eol=crlf so the bytes are stored as-is; the existing .bat files are
+# already committed with CRLF, and normalising them would rewrite every
+# line of an otherwise untouched file.
+*.cmd -text
+*.bat -text

@@ -24,6 +24,8 @@
 /win-temp
 _build
 /build-*
+# ...but the installer build script is source, not a build directory.
+!/build-installer.cmd
 pgadmin4.log
 pkg/win32/installer.iss
 pkg/mac/codesign.confx
@@ -62,3 +64,9 @@ web/regression/.coverage
 .worktree/
 web/regression/covhtml/
 web/regression/htmlcov/
+
+# Development data directory created by dev-run.cmd
+/dev-data/
+
+# Intermediate output from the Inno Setup compile
+pkg/win32/Output/
